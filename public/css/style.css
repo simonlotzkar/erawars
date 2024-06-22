@@ -1,0 +1,15 @@
+body {
+    background: purple;
+}
+
+#canvas0 {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border: 5px white solid;
+}
+
+#soldierImage, #backgroundImage, #castleImage {
+    display: none;
+}
