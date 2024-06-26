@@ -375,8 +375,12 @@ window.addEventListener("load", function(){
             if (this.dealer.strength * 2 == this.damage) {
                 context.fillStyle = "red";
             }
-            let fontSize = 20 * (this.damage / this.dealer.strength);
+            let fontSize = 30 * (this.damage / this.dealer.strength);
             context.font = fontSize + "px Helvetica";
+            context.strokeStyle = "black";
+            context.lineWidth = 2;
+        
+            context.strokeText(Math.round(this.damage), this.x, this.y);
             context.fillText(Math.round(this.damage), this.x, this.y);
         }
 
