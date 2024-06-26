@@ -10,6 +10,6 @@ body {
     border: 5px white solid;
 }
 
-#soldierImage, #backgroundImage, #castleImage {
+#soldierImage, #castleImage, #plankImage, #plusIconImage, #exclamationIconImage, #swordsIconImage, #backgroundImage {
     display: none;
 }
