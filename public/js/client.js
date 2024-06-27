@@ -31,7 +31,7 @@ window.addEventListener("load", function(){
 
     // Represents a soldier NPC that is either a player or enemy.
     class Soldier {
-        constructor(isPlayer, strength, vitality, agility, luck, range, spriteSource) {
+        constructor(isPlayer, strength, vitality, agility, luck, range, spriteSource, castles) {
             this.isPlayer = isPlayer;
             this.strength = strength;
             this.vitality = vitality;
@@ -65,9 +65,11 @@ window.addEventListener("load", function(){
             this.damageNumbers = [];
 
             if (this.isPlayer) {
-                this.x = 10 + cameraX; // spawn at the left of the map
+                this.castle = castles.filter(castle => castle.isPlayer)[0];
+                this.x = this.castle.x;
             } else {
-                this.x = gameWidth - this.width - 10 - cameraX;         // spawn at the right of the map
+                this.castle = castles.filter(castle => !castle.isPlayer)[0];
+                this.x = this.castle.x + this.castle.width - this.width;
                 this.speed *= -1;                                       // reverse the speed direction
                 this.rangeX = this.x - (this.width * (this.range - 1)); // offset the rangeBox to the left
             }
@@ -143,6 +145,7 @@ window.addEventListener("load", function(){
             this.stopMovingIfAtEdge(castles);
             this.handleMovement(timeSinceLastUpdate);
             this.updateRangeX();
+            this.damageNumbers = this.damageNumbers.filter(damageNumber => !damageNumber.deleteable);
         }
 
         // If this soldier has a target, immobilizes them and tries to attack,
@@ -326,17 +329,17 @@ window.addEventListener("load", function(){
             this.isPlayer = isPlayer;
             this.maxHP = 100;
             this.hp = this.maxHP;
+            this.damageNumbers = [];
+            
             this.image = document.getElementById("castleImage");
-
             this.width = 300;
             this.height = 300;
             this.y = gameHeight - this.height;
-            this.damageNumbers = [];
 
             if (this.isPlayer) {
-                this.x = 300; // spawn at the left of the map
+                this.x = 300;
             } else {
-                this.x = gameWidth - this.width - 300; // spawn at the right of the map
+                this.x = gameWidth - this.width - 300;
             }
         }
 
@@ -356,6 +359,13 @@ window.addEventListener("load", function(){
 
         update() {
             this.x += cameraSpeed;
+            this.damageNumbers = this.damageNumbers.filter(damageNumber => !damageNumber.deleteable);
+        }
+    }
+
+    class Building {
+        constructor() {
+
         }
     }
 
@@ -368,6 +378,7 @@ window.addEventListener("load", function(){
             this.y = this.reciever.y;
             this.xScale = (Math.random() - 0.5) * 5;
             this.yScale = (Math.random() + 0.5) * 5;
+            this.deleteable = false;
         }
 
         draw(context) {
@@ -388,6 +399,9 @@ window.addEventListener("load", function(){
             this.x += this.xScale + cameraSpeed;
             this.y -= this.yScale;
             this.yScale -= 0.5;
+            if (this.y > gameHeight) {
+                this.deleteable = true;
+            }
         }
     }
 
@@ -418,20 +432,21 @@ window.addEventListener("load", function(){
     }
 
     const input = new InputHandler();
-    // soldier(isPlayer, strength, vitality, agility, luck, range, sourceImage)
-    const soldier0 = new Soldier(true, 2, 2, 4, 2, 4, "soldierImage");
-    const soldier1 = new Soldier(false, 4, 4, 4, 4, 2, "soldierImage");
-    let soldiers = [soldier0, soldier1];
     const playerCastle = new Castle(true);
     const enemyCastle = new Castle(false);
     let castles = [playerCastle, enemyCastle];
+    // soldier(isPlayer, strength, vitality, agility, luck, range, sourceImage)
+    const soldier0 = new Soldier(true, 2, 2, 4, 2, 4, "soldierImage", castles);
+    const soldier1 = new Soldier(false, 4, 4, 4, 4, 2, "soldierImage", castles);
+    let soldiers = [soldier0, soldier1];
     const background = new Background();
 
     let food = 10;
 
     document.getElementById("spawnButton").addEventListener("click", function() {
         if (food > 0) {
-            soldiers.push(new Soldier(true, 1, 1, 4, 1, 1, "soldierImage"));  
+            soldiers.push(new Soldier(true, 1, 1, 4, 1, 1, "soldierImage", castles));  
+            soldiers.push(new Soldier(false, 1, 1, 4, 1, 1, "soldierImage", castles));  
             food--;
         }
     })
