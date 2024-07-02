@@ -324,23 +324,16 @@ window.addEventListener("load", function(){
         }
     }
 
-    class Castle {
+    class Building {
+        image;
+        x;
+        y;
+        width;
+        height;
+        damageNumbers;
+
         constructor(isPlayer) {
             this.isPlayer = isPlayer;
-            this.maxHP = 100;
-            this.hp = this.maxHP;
-            this.damageNumbers = [];
-            
-            this.image = document.getElementById("castleImage");
-            this.width = 300;
-            this.height = 300;
-            this.y = gameHeight - this.height;
-
-            if (this.isPlayer) {
-                this.x = 300;
-            } else {
-                this.x = gameWidth - this.width - 300;
-            }
         }
 
         draw(context) {
@@ -355,7 +348,7 @@ window.addEventListener("load", function(){
                 damageNumber.draw(context);
                 damageNumber.update();
             });
-        }
+        }        
 
         update() {
             this.x += cameraSpeed;
@@ -363,9 +356,157 @@ window.addEventListener("load", function(){
         }
     }
 
-    class Building {
-        constructor() {
+    class Castle extends Building {
+        constructor(isPlayer) {
+            super(isPlayer);
+            this.maxHP = 100;
+            this.hp = this.maxHP;
+            this.damageNumbers = [];
+            
+            this.image = document.getElementById("castleImage");
+            this.width = 300;
+            this.height = 300;
+            this.y = gameHeight - this.height;
 
+            if (this.isPlayer) {
+                this.x = 10;
+            } else {
+                this.x = gameWidth - this.width - 10;
+            }
+
+            this.buildingCount = 2;
+            this.buildingPlots = [];
+            for (let i = 0; i < this.buildingCount; i++) {
+                if (this.isPlayer) {
+                    this.buildingPlots.push(new BuildingPlot(true, this.x + this.width * 2 + this.width * i));
+                } else {
+                    this.buildingPlots.push(new BuildingPlot(false, this.x - this.width - this.width * i));
+                }
+            }
+        }
+
+        draw(context) {
+            super.draw(context);
+            this.buildingPlots.forEach(buildingPlot => {
+                buildingPlot.draw(context);
+            });
+        }
+
+        update() {
+            super.update();
+            this.buildingPlots.forEach(buildingPlot => {
+                buildingPlot.update();
+            });
+        }
+    }
+
+    class BuildingPlot {
+        constructor(isPlayer, x) {
+            this.isPlayer = isPlayer;
+            this.image = document.getElementById("plankImage");
+            this.width = 200;
+            this.height = 20;
+            this.y = gameHeight - this.height;
+
+            if (this.isPlayer) {
+                this.x = x;
+            } else {
+                this.x = x - this.width;
+            }
+
+            this.building = null;
+
+            this.buildButtonImage = document.getElementById("plusIconImage");
+            this.buildButtonWidth = this.width / 2;
+            this.buildButtonHeight = this.buildButtonWidth;
+            this.buildButtonX = this.x + this.buildButtonWidth / 2;
+            this.buildButtonY = this.y - this.buildButtonHeight * 1.5;
+
+            this.buildButtonClicked = false;
+            this.buildingButtonsCount = 6;
+            this.buildingButtons = [];
+
+            for (let i = 0; i < this.buildingButtonsCount; i++) {
+                this.buildingButtons.push(new BuildingButton(i, this.x, this.y, this.width, this.height));
+            }
+        }
+
+        draw(context) {
+            if (this.building == null && this.isPlayer) {
+                if (this.buildButtonClicked) {
+                    this.buildingButtons.forEach(buildingButton => buildingButton.draw(context));
+                } else {
+                    context.drawImage(this.buildButtonImage, this.buildButtonX, this.buildButtonY, this.buildButtonWidth, this.buildButtonHeight);
+                }
+            } else if (this.building != null) {
+                this.building.draw(context);
+            }
+            context.drawImage(this.image, this.x, this.y, this.width, this.height);
+        }
+
+        update() {
+            if (this.building == null && this.isPlayer) {
+                if (this.buildButtonClicked) {
+                    this.buildingButtons.forEach(buildingButton => buildingButton.update());
+                } else {
+                    this.buildButtonX += cameraSpeed;
+                }
+            } else if (this.building != null) {
+                this.building.update();
+            }
+            this.x += cameraSpeed;
+        }
+    }
+
+    class BuildingButton {
+        constructor(idNumber, plotX, plotY, plotWidth) {
+            this.idNumber = idNumber;
+
+            this.width = plotWidth / 3;
+            this.height = this.width;
+
+            this.padding = this.width / 5;
+
+            this.x = plotX + (plotWidth / 2) - this.width - (this.padding / 2);
+            this.y = plotY - this.padding;
+
+            switch (this.idNumber) {
+                case 0:
+                    this.y -= this.width;
+                    this.image = document.getElementById("farmIconImage");
+                    break;
+                case 1:
+                    this.y -= this.width;
+                    this.x += this.width + this.padding;
+                    this.image = document.getElementById("houseIconImage");
+                    break;
+                case 2:
+                    this.y -= 2 * this.width + this.padding;
+                    this.image = document.getElementById("shieldIconImage");
+                    break;
+                case 3:
+                    this.y -= 2 * this.width + this.padding;
+                    this.x += this.width + this.padding;
+                    this.image = document.getElementById("mineIconImage");
+                    break;
+                case 4:
+                    this.y -= 3 * this.width + (this.padding * 2);
+                    this.image = document.getElementById("towerIconImage");
+                    break;
+                case 5:
+                    this.y -= 3 * this.width + (this.padding * 2);
+                    this.x += this.width + this.padding;
+                    this.image = document.getElementById("sawmillIconImage");
+                    break;
+            }
+        }
+
+        draw(context) {
+            context.drawImage(this.image, this.x, this.y, this.width, this.height);
+        }
+
+        update() {
+            this.x += cameraSpeed;
         }
     }
 
@@ -378,6 +519,7 @@ window.addEventListener("load", function(){
             this.y = this.reciever.y;
             this.xScale = (Math.random() - 0.5) * 5;
             this.yScale = (Math.random() + 0.5) * 5;
+            this.gravity = 0.981;
             this.deleteable = false;
         }
 
@@ -398,7 +540,7 @@ window.addEventListener("load", function(){
         update() {
             this.x += this.xScale + cameraSpeed;
             this.y -= this.yScale;
-            this.yScale -= 0.5;
+            this.yScale -= this.gravity;
             if (this.y > gameHeight) {
                 this.deleteable = true;
             }
@@ -432,13 +574,16 @@ window.addEventListener("load", function(){
     }
 
     const input = new InputHandler();
+
     const playerCastle = new Castle(true);
     const enemyCastle = new Castle(false);
     let castles = [playerCastle, enemyCastle];
-    // soldier(isPlayer, strength, vitality, agility, luck, range, sourceImage)
+
+    // soldier(isPlayer, strength, vitality, agility, luck, range, sourceImage, castles)
     const soldier0 = new Soldier(true, 2, 2, 4, 2, 4, "soldierImage", castles);
     const soldier1 = new Soldier(false, 4, 4, 4, 4, 2, "soldierImage", castles);
     let soldiers = [soldier0, soldier1];
+
     const background = new Background();
 
     let food = 10;
@@ -475,9 +620,9 @@ window.addEventListener("load", function(){
         castles = castles.filter(castle => castle.hp > 0);
         if (castles.length < 2) {
             if (castles[0].isPlayer) {
-                alert("You win!");
+                // alert("You win!");
             } else {
-                alert("You lose!");
+                // alert("You lose!");
             }
         }      
         
