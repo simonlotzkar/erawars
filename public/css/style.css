@@ -1,15 +1,28 @@
 body {
     background: purple;
-}
-
-#canvas0 {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    border: 5px white solid;
+    color: white
 }
 
 .sprite {
     display: none;
+}
+
+.resourceIcon {
+    width:auto;
+    height:1rem;
+}
+
+.container {
+    border: 5px, black, solid;
+}
+
+#uiHeader {
+    display: flex;
+    justify-content: space-between;
+}
+
+#uiFooter {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
 }

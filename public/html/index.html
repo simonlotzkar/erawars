@@ -7,23 +7,92 @@
     <link rel="stylesheet" href="/css/style.css"/>
 </head>
 <body>
-    <canvas id="canvas0" ></canvas>
+    <div class="container">
+        <header id="uiHeader">
+            <div id="playerInfoContainer" class="container">
+                <div id="playerStatusContainer" class="container">
+                    <h1 id="playerName">Player Name</h1>
+                    <span id="playerHealthbar">0/0</span>
+                </div>
+                <div id="playerEraContainer" class="container">
+                    <h1 id="playerEra">I</h1>
+                    <span id="playerEraProgress">0/0</span>
+                </div>
+            </div>
+            <div id="enemyInfoContainer" class="container">
+                <div id="enemyStatusContainer" class="container">
+                    <h1 id="enemyName">Enemy Name</h1>
+                    <span id="enemyHealthbar">0/0</span>
+                </div>
+                <div id="enemyEraContainer" class="container">
+                    <h1 id="enemyEra">I</h1>
+                    <span id="enemyEraProgress">0/0</span>
+                </div>
+            </div>
+        </header>
+        <div id="gameContainer" class="container">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+        <footer id="uiFooter">
+            <div id="resourcesContainer" class="container">
+                <div id="foodContainer" class="container resourceContainer">
+                    <span id="foodCount" class="resourceCount">0</span>
+                    <img id="foodIcon" class="resourceIcon" src="/images/icons/resourceIcons/wheatIcon.png"/>
+                </div>
+                <div id="woodContainer" class="container resourceContainer">
+                    <span id="woodCount" class="resourceCount">0</span>
+                    <img id="woodIcon" class="resourceIcon" src="/images/icons/resourceIcons/woodIcon.png"/>
+                </div>
+                <div id="stoneContainer" class="container resourceContainer">
+                    <span id="stoneCount" class="resourceCount">0</span>
+                    <img id="stoneIcon" class="resourceIcon" src="/images/icons/resourceIcons/stoneIcon.png"/>
+                </div>
+                <div id="horsesContainer" class="container resourceContainer">
+                    <span id="horsesCount" class="resourceCount">0</span>
+                    <img id="horsesIcon" class="resourceIcon" src="/images/icons/resourceIcons/horseIcon.png"/>
+                </div>
+                <div id="metalContainer" class="container resourceContainer">
+                    <span id="metalCount" class="resourceCount">0</span>
+                    <img id="metalIcon"  class="resourceIcon"src="/images/icons/resourceIcons/ingotIcon.png"/>
+                </div>
+            </div>
+            <div id="dialogueContainer" class="container">
+                <div id="dialogueHeader">
+                    <h1 id="dialogueTitle">Dialogue</h1>
+                    <p id="dialogueContent">Dialogue content</p>
+                    <div id="dialogueButtons">
+                        <button id="dialogueConfirmButton">Confirm</button>
+                        <button id="dialogueDenyButton">Deny</button>
+                    </div>
+                </div>
+            </div>
+            <div id="populationContainer" class="container">
+                <div id="housingContainer" class="container">
+                    <span id="housingCount">0</span>
+                    <span id="housingMaximum">/0</span>
+                    <img id="housingIcon" class="resourceIcon" src="/images/icons/buildingIcons/houseIcon.png"/>
+                </div>
+                <div id="troopsContainer" class="container"></div>
+            </div>
+        </footer>
+    </div>
+
     <img class="sprite" id="soldierImage" src="/images/soldier0.png"/>
     <img class="sprite" id="castleImage" src="/images/castle.png"/>
+    <img class="sprite" id="backgroundImage" src="/images/mapV0.png"/>
     <img class="sprite" id="plankImage" src="/images/plank.png"/>
+
     <img class="sprite" id="exclamationIconImage" src="/images/icons/exclamationIcon.png"/>
     <img class="sprite" id="swordsIconImage" src="/images/icons/swordsIcon.png"/>
-    <img class="sprite" id="backgroundImage" src="/images/mapV0.png"/>
     <img class="sprite" id="plusIconImage" src="/images/icons/plusIcon.png"/>
+    <img class="sprite" id="checkmarkIconImage" src="/images/icons/checkmarkIcon.png"/>
 
-    <img class="sprite" id="farmIconImage" src="/images/icons/farmIcon.png"/>
-    <img class="sprite" id="houseIconImage" src="/images/icons/houseIcon.png"/>
-    <img class="sprite" id="shieldIconImage" src="/images/icons/shieldIcon.png"/>
-    <img class="sprite" id="mineIconImage" src="/images/icons/mineIcon.png"/>
-    <img class="sprite" id="towerIconImage" src="/images/icons/towerIcon.png"/>
-    <img class="sprite" id="sawmillIconImage" src="/images/icons/sawmillIcon.png"/>
-    
-    <button id="spawnButton">Spawn (1Food)</button>
+    <img class="sprite" id="farmIconImage" src="/images/icons/buildingIcons/farmIcon.png"/>
+    <img class="sprite" id="houseIconImage" src="/images/icons/buildingIcons/houseIcon.png"/>
+    <img class="sprite" id="shieldIconImage" src="/images/icons/buildingIcons/shieldIcon.png"/>
+    <img class="sprite" id="mineIconImage" src="/images/icons/buildingIcons/mineIcon.png"/>
+    <img class="sprite" id="towerIconImage" src="/images/icons/buildingIcons/towerIcon.png"/>
+    <img class="sprite" id="sawmillIconImage" src="/images/icons/buildingIcons/sawmillIcon.png"/>
 
     <script src="/socket.io/socket.io.js"></script>
     <script type="module" src="../js/client.js"></script>

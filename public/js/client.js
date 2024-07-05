@@ -1,7 +1,8 @@
 window.addEventListener("load", function(){
     const gameHeight = 720;
     const gameWidth = 3000;
-    const canvas = document.getElementById("canvas0");
+    const gameFloor = 140;
+    const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
 
     canvas.width = 1080;
@@ -43,7 +44,7 @@ window.addEventListener("load", function(){
             this.height = 100;
             this.sourceWidth = 32;
             this.sourceHeight = 32;
-            this.y = gameHeight - this.height;
+            this.y = gameHeight - this.height - gameFloor;
             this.image = document.getElementById(spriteSource);
 
             this.frame = 0;
@@ -366,7 +367,7 @@ window.addEventListener("load", function(){
             this.image = document.getElementById("castleImage");
             this.width = 300;
             this.height = 300;
-            this.y = gameHeight - this.height;
+            this.y = gameHeight - this.height - gameFloor;
 
             if (this.isPlayer) {
                 this.x = 10;
@@ -406,7 +407,7 @@ window.addEventListener("load", function(){
             this.image = document.getElementById("plankImage");
             this.width = 200;
             this.height = 20;
-            this.y = gameHeight - this.height;
+            this.y = gameHeight - this.height - gameFloor;
 
             if (this.isPlayer) {
                 this.x = x;
@@ -445,16 +446,37 @@ window.addEventListener("load", function(){
         }
 
         update() {
-            if (this.building == null && this.isPlayer) {
-                if (this.buildButtonClicked) {
-                    this.buildingButtons.forEach(buildingButton => buildingButton.update());
-                } else {
-                    this.buildButtonX += cameraSpeed;
-                }
-            } else if (this.building != null) {
+            if (this.building != null) {
                 this.building.update();
             }
+            this.buildButtonX += cameraSpeed;
+            this.buildingButtons.forEach(buildingButton => buildingButton.update());
             this.x += cameraSpeed;
+        }
+
+        handleClick(x, y) {
+            if (!this.isPlayer) {
+                return;
+            }
+            if (
+                x >= this.buildButtonX && x <= this.buildButtonX + this.buildButtonWidth &&
+                y >= this.buildButtonY && y <= this.buildButtonY + this.buildButtonHeight &&
+                !this.buildButtonClicked
+            ) {
+                this.buildButtonClicked = true;
+                return;
+            }
+
+            let clickedOnBuildingButton = false;
+            this.buildingButtons.forEach(buildingButton => {
+                if (buildingButton.handleClick(x, y)) {
+                    clickedOnBuildingButton = true;
+                }
+            });
+
+            if (!clickedOnBuildingButton) {
+                this.buildButtonClicked = false;
+            }
         }
     }
 
@@ -469,6 +491,8 @@ window.addEventListener("load", function(){
 
             this.x = plotX + (plotWidth / 2) - this.width - (this.padding / 2);
             this.y = plotY - this.padding;
+
+            this.clicked = false;
 
             switch (this.idNumber) {
                 case 0:
@@ -503,10 +527,41 @@ window.addEventListener("load", function(){
 
         draw(context) {
             context.drawImage(this.image, this.x, this.y, this.width, this.height);
+
+            if (this.clicked) {
+                context.strokeStyle = "green";
+                context.lineWidth = 5;
+                context.strokeRect(
+                    this.x, 
+                    this.y, 
+                    this.width, 
+                    this.height);
+            } else {
+                context.strokeStyle = "black";
+                context.lineWidth = 2.5;
+                context.strokeRect(
+                    this.x, 
+                    this.y, 
+                    this.width, 
+                    this.height);
+            }
         }
 
         update() {
             this.x += cameraSpeed;
+        }
+
+        handleClick(x, y) {
+            if (
+                x >= this.x && x <= this.x + this.width &&
+                y >= this.y && y <= this.y + this.height
+            ) {
+                this.clicked = true;
+                return true;
+            } else {
+                this.clicked = false;
+                return false;
+            }
         }
     }
 
@@ -574,32 +629,33 @@ window.addEventListener("load", function(){
     }
 
     const input = new InputHandler();
-
-    const playerCastle = new Castle(true);
-    const enemyCastle = new Castle(false);
-    let castles = [playerCastle, enemyCastle];
-
-    // soldier(isPlayer, strength, vitality, agility, luck, range, sourceImage, castles)
-    const soldier0 = new Soldier(true, 2, 2, 4, 2, 4, "soldierImage", castles);
-    const soldier1 = new Soldier(false, 4, 4, 4, 4, 2, "soldierImage", castles);
-    let soldiers = [soldier0, soldier1];
-
     const background = new Background();
+    let castles = [
+        new Castle(true), 
+        new Castle(false)
+    ];
+    let soldiers = [];
+    // soldier(isPlayer, strength, vitality, agility, luck, range, sourceImage, castles)
 
-    let food = 10;
-
-    document.getElementById("spawnButton").addEventListener("click", function() {
-        if (food > 0) {
-            soldiers.push(new Soldier(true, 1, 1, 4, 1, 1, "soldierImage", castles));  
-            soldiers.push(new Soldier(false, 1, 1, 4, 1, 1, "soldierImage", castles));  
-            food--;
+    class Resources {
+        constructor() {
+            this.food = 10;
+            this.wood = 10;
+            this.stone = 10;
+            this.horses = 0;
+            this.metal = 0;
         }
-    })
-    
-    function displayUI(context) {
-        context.fillStyle = "black";
-        context.font = "40px Helvetica";
-        context.fillText("Food: " + food, 20, 50);
+    }
+
+    let playerResources = new Resources();
+    let enemyResources = new Resources();
+
+    function updateUI() {
+        document.getElementById("foodCount").innerText = playerResources.food;
+        document.getElementById("woodCount").innerText = playerResources.wood;
+        document.getElementById("stoneCount").innerText = playerResources.stone;
+        document.getElementById("horsesCount").innerText = playerResources.horses;
+        document.getElementById("metalCount").innerText = playerResources.metal;
     }
 
     let prevTimestamp = 0;
@@ -632,9 +688,21 @@ window.addEventListener("load", function(){
         });
         soldiers = soldiers.filter(soldier => soldier.hp > 0);
 
-        displayUI(ctx);
+        updateUI();
+
         requestAnimationFrame(animate);
     }
 
     animate(0);
+
+    canvas.addEventListener("click", function(event) {
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        castles.forEach(castle => {
+            castle.buildingPlots.forEach(plot => {
+                plot.handleClick(x, y);
+            });
+        });
+    });
 });
