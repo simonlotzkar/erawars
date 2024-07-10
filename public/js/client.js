@@ -30,22 +30,60 @@ window.addEventListener("load", function(){
         }
     }
 
-    // Represents a soldier NPC that is either a player or enemy.
-    class Soldier {
-        constructor(isPlayer, strength, vitality, agility, luck, range, spriteSource, castles) {
-            this.isPlayer = isPlayer;
+    class SoldierType {
+        constructor(name, strength, vitality, agility, luck, range, spriteName, resourcesCost) {
+            this.name = name;
+
+            this.level = 0;
+            this.xp = 0;
+            this.xpMax = 100;
+
             this.strength = strength;
             this.vitality = vitality;
             this.agility = agility;
             this.luck = luck;
             this.range = range;
-        
+
+            this.spriteName = spriteName;
+
+            this.resourcesCost = resourcesCost;
+        }
+
+        update() {
+            if (this.xp >= this.xpMax) {
+                this.level++;
+                this.xp = 0;
+                this.xpMax *= (1 + (1 / 3));
+
+                this.strength *= (1 + (1 / 5));
+                this.vitality *= (1 + (1 / 5));
+                this.agility *= (1 + (1 / 5));
+                this.luck *= (1 + (1 / 5));
+                this.range *= (1 + (1 / 5));
+
+                this.resourcesCost.increaseAllByPercent(10);
+            }
+        }
+    }
+
+    // Represents a soldier NPC that is either a player or enemy.
+    class Soldier {
+        constructor(isPlayer, soldierType, castle) {
+            this.isPlayer = isPlayer;
+            this.soldierType = soldierType;
+            this.castle = castle;
+
+            this.strength = this.soldierType.strength;
+            this.vitality = this.soldierType.vitality;
+            this.agility = this.soldierType.agility;
+            this.luck = this.soldierType.luck;
+            this.range = this.soldierType.range;
+            
             this.width = 100;
             this.height = 100;
             this.sourceWidth = 32;
             this.sourceHeight = 32;
-            this.y = gameHeight - this.height - gameFloor;
-            this.image = document.getElementById(spriteSource);
+            this.y = gameHeight - this.height - gameFloor;            
 
             this.frame = 0;
             this.maxFrame = 4;
@@ -66,13 +104,15 @@ window.addEventListener("load", function(){
             this.damageNumbers = [];
 
             if (this.isPlayer) {
-                this.castle = castles.filter(castle => castle.isPlayer)[0];
                 this.x = this.castle.x;
+                this.image = document.getElementById(this.soldierType.spriteName);
             } else {
-                this.castle = castles.filter(castle => !castle.isPlayer)[0];
                 this.x = this.castle.x + this.castle.width - this.width;
                 this.speed *= -1;                                       // reverse the speed direction
                 this.rangeX = this.x - (this.width * (this.range - 1)); // offset the rangeBox to the left
+
+                this.image = document.getElementById(this.soldierType.spriteName);
+                // this.image = document.getElementById(this.soldierType.spriteName + "Reversed");
             }
         }
 
@@ -141,9 +181,9 @@ window.addEventListener("load", function(){
         }
 
         // Runs every animation frame
-        update(timeSinceLastUpdate, soldiers, castles) {
-            this.handleCombat(timeSinceLastUpdate, soldiers, castles);
-            this.stopMovingIfAtEdge(castles);
+        update(timeSinceLastUpdate, soldiers, teams) {
+            this.handleCombat(timeSinceLastUpdate, soldiers, teams);
+            this.stopMovingIfAtEdge();
             this.handleMovement(timeSinceLastUpdate);
             this.updateRangeX();
             this.damageNumbers = this.damageNumbers.filter(damageNumber => !damageNumber.deleteable);
@@ -151,12 +191,12 @@ window.addEventListener("load", function(){
 
         // If this soldier has a target, immobilizes them and tries to attack,
         // otherwise looks for a new target.
-        handleCombat(timeSinceLastUpdate, soldiers, castles) {
+        handleCombat(timeSinceLastUpdate, soldiers, teams) {
             if (this.target != null) {
                 this.moveable = false;
                 this.handleAttack(timeSinceLastUpdate);
             } else {
-                this.checkForNewTarget(soldiers, castles);
+                this.checkForNewTarget(soldiers, teams);
             }
         }
 
@@ -219,13 +259,13 @@ window.addEventListener("load", function(){
         // Checks all soldiers that are not this soldier and on the other side to see 
         // if they are in range of this soldier's attacks then sets them to this 
         // soldier's target if so and if not clears this soldier's target.
-        checkForNewTarget(soldiers, castles) {
+        checkForNewTarget(soldiers, teams) {
             soldiers.forEach(soldier => {
                 if (soldier === this) return;
                 this.targetIfValidCollision(soldier);
             });
-            castles.forEach(castle => {
-                this.targetIfValidCollision(castle);
+            teams.forEach(team => {
+                this.targetIfValidCollision(team.castle);
             });
         }
 
@@ -455,9 +495,6 @@ window.addEventListener("load", function(){
         }
 
         handleClick(x, y) {
-            if (!this.isPlayer) {
-                return;
-            }
             if (
                 x >= this.buildButtonX && x <= this.buildButtonX + this.buildButtonWidth &&
                 y >= this.buildButtonY && y <= this.buildButtonY + this.buildButtonHeight &&
@@ -602,6 +639,171 @@ window.addEventListener("load", function(){
         }
     }
 
+    class Resources {
+        constructor(food, wood, stone, horses, metal) {
+            this.food = food;
+            this.wood = wood;
+            this.stone = stone;
+            this.horses = horses;
+            this.metal = metal;
+        }
+
+        deductOrFail(resourcesCost) {
+            if (
+                this.food >= resourcesCost.food &&
+                this.wood >= resourcesCost.wood &&
+                this.stone >= resourcesCost.stone &&
+                this.horses >= resourcesCost.horses &&
+                this.metal >= resourcesCost.metal
+            ) {
+                this.food -= resourcesCost.food;
+                this.wood -= resourcesCost.wood;
+                this.stone -= resourcesCost.stone;
+                this.horses -= resourcesCost.horses;
+                this.metal -= resourcesCost.metal;
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        increaseAllByPercent(percent) {
+            this.food *= (1 + (percent / 100));
+            this.wood *= (1 + (percent / 100));
+            this.stone *= (1 + (percent / 100));
+            this.horses *= (1 + (percent / 100));
+            this.metal *= (1 + (percent / 100));
+        }
+    }
+
+    class Team {
+        constructor(isPlayer, username) {
+            this.isPlayer = isPlayer;
+            this.username = username;
+            this.castle = new Castle(isPlayer);
+
+            this.era = 0;
+            this.eraXP = 0;
+            this.eraXPMax = 1000;
+
+            this.resources = new Resources(10, 10, 10, 0, 0);
+
+            this.housing = 0;
+            this.housingMax = 5;
+
+            if (this.isPlayer) {
+                this.updateUnitSpawnButtons();
+            }
+        }
+
+        draw(context) {
+            this.castle.draw(context);
+        }
+
+        update() {
+            this.castle.update();
+
+            if (this.eraXP >= this.eraXPMax) {
+                this.era++;
+                this.eraXP = 0;
+                this.eraXPMax *= (1 + (2 / 3));
+
+                if (this.isPlayer) {
+                    this.updateUnitSpawnButtons();
+                }
+            }
+        }
+
+        getUnits() {
+            switch (this.era) {
+                case 0:
+                    return [
+                        new SoldierType("Smasher", 2, 2, 1, 1, 1, "soldierImage", new Resources(1, 0, 1, 0, 0)),
+                        new SoldierType("Thrower", 1, 1, 2, 2, 3, "soldierImage", new Resources(1, 1, 0, 0, 0))
+                    ];
+                case 1:
+                    return [
+                        new SoldierType("Smasher", 2, 2, 1, 1, 1, "soldierImage", new Resources(1, 0, 1, 0, 0)),
+                        new SoldierType("Thrower", 1, 1, 2, 2, 3, "soldierImage", new Resources(1, 1, 0, 0, 0))
+                    ];
+                case 2:
+                    return [
+                        new SoldierType("Smasher", 2, 2, 1, 1, 1, "soldierImage", new Resources(1, 0, 1, 0, 0)),
+                        new SoldierType("Thrower", 1, 1, 2, 2, 3, "soldierImage", new Resources(1, 1, 0, 0, 0))
+                    ];
+                case 3: 
+                    return [
+                        new SoldierType("Smasher", 2, 2, 1, 1, 1, "soldierImage", new Resources(1, 0, 1, 0, 0)),
+                        new SoldierType("Thrower", 1, 1, 2, 2, 3, "soldierImage", new Resources(1, 1, 0, 0, 0))
+                    ];
+                case 4:
+                    return [
+                        new SoldierType("Smasher", 2, 2, 1, 1, 1, "soldierImage", new Resources(1, 0, 1, 0, 0)),
+                        new SoldierType("Thrower", 1, 1, 2, 2, 3, "soldierImage", new Resources(1, 1, 0, 0, 0))
+                    ];
+            }
+        }
+
+        updateUnitSpawnButtons() {
+            let unitContainer = document.getElementById("troopsContainer");
+            unitContainer.innerHTML = "";
+
+            let units = this.getUnits();
+            let team = this;
+            units.forEach(unit => {
+                let spawnButton = document.createElement("button");
+                spawnButton.textContent = unit.name + " Level: " + unit.level + " (" + unit.xp + "/" + unit.xpMax + ")";
+                spawnButton.id = unit.name;
+                spawnButton.addEventListener("click", function() {
+                    team.handleSoldierTypeClick(unit, team);
+                });
+
+                unitContainer.appendChild(spawnButton);
+            });
+        }
+
+        handleSoldierTypeClick(soldierType, team) {
+            // Clear canvas clicks
+            this.castle.buildingPlots.forEach(plot => {
+                plot.buildButtonClicked = false;
+                plot.buildingButtons.forEach(button => {
+                    button.clicked = false;
+                });
+            });
+
+            let dialogueTitle = document.getElementById("dialogueTitle");
+            dialogueTitle.innerHTML = "Unit: " + soldierType.name;
+
+            let dialogueContent = document.getElementById("dialogueContent");
+            dialogueContent.innerHTML = getSoldierTypeString(soldierType);
+
+            let dialogueButtons = document.getElementById("dialogueButtons");
+            dialogueButtons.innerHTML = "";
+
+            let spawnButton = document.createElement("button");
+            spawnButton.innerHTML = "Spawn";
+            spawnButton.addEventListener("click", function() {
+                team.handleSpawnSoldierClick(soldierType);
+            });
+
+            dialogueButtons.appendChild(spawnButton);
+        }
+
+        handleSpawnSoldierClick(soldierType) {
+            if (this.resources.deductOrFail(soldierType.resourcesCost)) {
+                soldiers.push(new Soldier(true, soldierType, this.castle));
+            }
+        }
+    }
+
+    function getSoldierTypeString(soldierType) {
+        return "Str: " + soldierType.strength +
+        " Agi: " + soldierType.agility +
+        " Vit: " + soldierType.vitality + 
+        " Luk: " + soldierType.luck + 
+        " Range: " + soldierType.range + ".";
+    }
+
     // Draws the healthbar and shows text of the health of the object given.
     // REQUIRES: Object has an x,y,width,height,hp,maxHP
     function drawHealthBar(context, object) {
@@ -630,32 +832,68 @@ window.addEventListener("load", function(){
 
     const input = new InputHandler();
     const background = new Background();
-    let castles = [
-        new Castle(true), 
-        new Castle(false)
-    ];
+
+    let playerTeam = new Team(true, "johndoe");
+    let enemyTeam = new Team(false, "janedoe");
     let soldiers = [];
-    // soldier(isPlayer, strength, vitality, agility, luck, range, sourceImage, castles)
-
-    class Resources {
-        constructor() {
-            this.food = 10;
-            this.wood = 10;
-            this.stone = 10;
-            this.horses = 0;
-            this.metal = 0;
-        }
-    }
-
-    let playerResources = new Resources();
-    let enemyResources = new Resources();
 
     function updateUI() {
-        document.getElementById("foodCount").innerText = playerResources.food;
-        document.getElementById("woodCount").innerText = playerResources.wood;
-        document.getElementById("stoneCount").innerText = playerResources.stone;
-        document.getElementById("horsesCount").innerText = playerResources.horses;
-        document.getElementById("metalCount").innerText = playerResources.metal;
+        // Update player username
+        let playerName = playerTeam.username;
+        document.getElementById("playerName").innerText = playerName;
+
+        // Update enemy username
+        let enemyName = enemyTeam.username;
+        document.getElementById("enemyName").innerText = enemyName;
+
+        // Update player healthbar
+        let playerHP = playerTeam.castle.hp;
+        let playerHPMax = playerTeam.castle.maxHP;
+        document.getElementById("playerHealthbar").innerText = playerHP + " / " + playerHPMax;
+
+        // Update enemy healthbar
+        let enemyHP = enemyTeam.castle.hp;
+        let enemyHPMax = enemyTeam.castle.maxHP;
+        document.getElementById("enemyHealthbar").innerText = enemyHP + " / " + enemyHPMax;
+
+        // Update player erabar
+        let playerEra = getEraString(playerTeam.era);
+        let playerEraXP = playerTeam.eraXP;
+        let playerEraXPMax = playerTeam.eraXPMax;
+        document.getElementById("playerEra").innerText = playerEra;
+        document.getElementById("playerEraProgress").innerText = playerEraXP + " / " + playerEraXPMax;
+
+        // Update enemy erabar
+        let enemyEra = getEraString(enemyTeam.era);
+        let enemyEraXP = enemyTeam.eraXP;
+        let enemyEraXPMax = enemyTeam.eraXPMax;
+        document.getElementById("enemyEra").innerText = enemyEra;
+        document.getElementById("enemyEraProgress").innerText = enemyEraXP + " / " + enemyEraXPMax;
+
+        // Update resources
+        document.getElementById("foodCount").innerText = playerTeam.resources.food;
+        document.getElementById("woodCount").innerText = playerTeam.resources.wood;
+        document.getElementById("stoneCount").innerText = playerTeam.resources.stone;
+        document.getElementById("horsesCount").innerText = playerTeam.resources.horses;
+        document.getElementById("metalCount").innerText = playerTeam.resources.metal;
+
+        // Update housing
+        document.getElementById("housingBar").innerText = playerTeam.housing + "/ " + playerTeam.housingMax;
+    }
+
+    function getEraString(era) {
+        switch (era) {
+            case 0:
+                return "I";
+            case 1:
+                return "II";
+            case 2:
+                return "III";
+            case 3: 
+                return "IV";
+            case 4:
+                return "V";
+        }
     }
 
     let prevTimestamp = 0;
@@ -669,22 +907,16 @@ window.addEventListener("load", function(){
         background.draw(ctx);
         background.update(input);
 
-        castles.forEach(castle => {
-            castle.draw(ctx);
-            castle.update();
+        let teams = [playerTeam, enemyTeam];
+
+        teams.forEach(team => {
+            team.draw(ctx);
+            team.update();
         });
-        castles = castles.filter(castle => castle.hp > 0);
-        if (castles.length < 2) {
-            if (castles[0].isPlayer) {
-                // alert("You win!");
-            } else {
-                // alert("You lose!");
-            }
-        }      
         
         soldiers.forEach(soldier => {
             soldier.draw(ctx);
-            soldier.update(deltaTimestamp, soldiers, castles);
+            soldier.update(deltaTimestamp, soldiers, teams);
         });
         soldiers = soldiers.filter(soldier => soldier.hp > 0);
 
@@ -695,14 +927,17 @@ window.addEventListener("load", function(){
 
     animate(0);
 
-    canvas.addEventListener("click", function(event) {
-        const rect = canvas.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
-        castles.forEach(castle => {
-            castle.buildingPlots.forEach(plot => {
-                plot.handleClick(x, y);
+    function addAllEventListeners() {
+        // Add canvas click listener
+        canvas.addEventListener("click", function(event) {
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            playerTeam.castle.buildingPlots.forEach(plot => {
+                    plot.handleClick(x, y);
             });
         });
-    });
+    }
+
+    addAllEventListeners();
 });
