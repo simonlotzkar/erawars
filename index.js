@@ -9,6 +9,7 @@ const io = new Server(httpServer);
 
 io.on("connect", (socket) => {
     console.log("user connected with socketID=", socket.id);
+    socket.emit("hello");
 });
   
 app.use(express.static(path.join(__dirname, "public")));

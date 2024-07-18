@@ -37,12 +37,14 @@ window.addEventListener("load", function(){
             this.level = 0;
             this.xp = 0;
             this.xpMax = 100;
-
+            
             this.strength = strength;
             this.vitality = vitality;
             this.agility = agility;
             this.luck = luck;
             this.range = range;
+
+            this.xpReward = this.strength + this.vitality + this.agility + this.luck + this.range;
 
             this.spriteName = spriteName;
 
@@ -61,6 +63,8 @@ window.addEventListener("load", function(){
                 this.luck *= (1 + (1 / 5));
                 this.range *= (1 + (1 / 5));
 
+                this.xpReward = this.strength + this.vitality + this.agility + this.luck + this.range;
+
                 this.resourcesCost.increaseAllByPercent(10);
             }
         }
@@ -68,8 +72,8 @@ window.addEventListener("load", function(){
 
     // Represents a soldier NPC that is either a player or enemy.
     class Soldier {
-        constructor(isPlayer, soldierType, castle) {
-            this.isPlayer = isPlayer;
+        constructor(team, soldierType, castle) {
+            this.team = team;
             this.soldierType = soldierType;
             this.castle = castle;
 
@@ -93,6 +97,8 @@ window.addEventListener("load", function(){
             this.maxHP = (this.vitality * 10);
             this.hp = this.maxHP;
             this.speed = (this.agility * 0.75);
+            this.xp = this.soldierType.xp
+            this.xpReward = this.soldierType.xpReward;
 
             this.moveable = true;
             this.target = null;
@@ -103,7 +109,7 @@ window.addEventListener("load", function(){
             this.critChance = (this.luck / 20);
             this.damageNumbers = [];
 
-            if (this.isPlayer) {
+            if (this.team.isPlayer) {
                 this.x = this.castle.x;
                 this.image = document.getElementById(this.soldierType.spriteName);
             } else {
@@ -181,8 +187,8 @@ window.addEventListener("load", function(){
         }
 
         // Runs every animation frame
-        update(timeSinceLastUpdate, soldiers, teams) {
-            this.handleCombat(timeSinceLastUpdate, soldiers, teams);
+        update(timeSinceLastUpdate, opposingTeam) {
+            this.handleCombat(timeSinceLastUpdate, opposingTeam);
             this.stopMovingIfAtEdge();
             this.handleMovement(timeSinceLastUpdate);
             this.updateRangeX();
@@ -191,12 +197,12 @@ window.addEventListener("load", function(){
 
         // If this soldier has a target, immobilizes them and tries to attack,
         // otherwise looks for a new target.
-        handleCombat(timeSinceLastUpdate, soldiers, teams) {
+        handleCombat(timeSinceLastUpdate, opposingTeam) {
             if (this.target != null) {
                 this.moveable = false;
                 this.handleAttack(timeSinceLastUpdate);
             } else {
-                this.checkForNewTarget(soldiers, teams);
+                this.checkForNewTarget(opposingTeam);
             }
         }
 
@@ -227,12 +233,11 @@ window.addEventListener("load", function(){
             let damage = this.calculateDamage();
             // console.log("damage:" + damage);
 
-            if (this.target.hp <= damage) {
-                this.target.hp = 0;
-            } else if (!(this.target.hp <= 0)) {
-                this.target.hp -= damage;
+            if (this.target.hp - damage <= 0) {
+                this.soldierType.xp += this.target.xpReward;
             }
 
+            this.target.hp -= damage;
             this.target.damageNumbers.push(new DamageNumber(damage, this.target, this));
         }
 
@@ -259,21 +264,23 @@ window.addEventListener("load", function(){
         // Checks all soldiers that are not this soldier and on the other side to see 
         // if they are in range of this soldier's attacks then sets them to this 
         // soldier's target if so and if not clears this soldier's target.
-        checkForNewTarget(soldiers, teams) {
-            soldiers.forEach(soldier => {
+        checkForNewTarget(opposingTeam) {
+            opposingTeam.soldiers.forEach(soldier => {
                 if (soldier === this) return;
                 this.targetIfValidCollision(soldier);
             });
-            teams.forEach(team => {
-                this.targetIfValidCollision(team.castle);
+            this.targetIfValidCollision(opposingTeam.castle);
+            opposingTeam.castle.buildingPlots.forEach(buildingPlot => {
+                this.targetIfValidCollision(buildingPlot.building);
             });
         }
 
         // TODO Documentation
         // REQUIRES: Object has isPlayer,x,y,width,height
         targetIfValidCollision(object) {
-            if (this.isPlayer && object.isPlayer) return;
-            if (!this.isPlayer && !object.isPlayer) return;
+            if (object === null) return;
+            if (this.team.isPlayer && object.team.isPlayer) return;
+            if (!this.team.isPlayer && !object.team.isPlayer) return;
 
             let hitBox = {x: object.x - cameraX, y: object.y, width: object.width, height: object.height};
             let rangeBox = {x: this.rangeX - cameraX, y: this.y, width: this.rangeWidth, height: this.height};
@@ -322,7 +329,7 @@ window.addEventListener("load", function(){
 
         // Updates the rangeX variable to the x variable and offset if enemy.
         updateRangeX() {
-            if (this.isPlayer) {
+            if (this.team.isPlayer) {
                 this.rangeX = this.x;
             } else {
                 this.rangeX = this.x - (this.width * (this.range - 1));
@@ -373,8 +380,8 @@ window.addEventListener("load", function(){
         height;
         damageNumbers;
 
-        constructor(isPlayer) {
-            this.isPlayer = isPlayer;
+        constructor(team) {
+            this.team = team;
         }
 
         draw(context) {
@@ -398,8 +405,8 @@ window.addEventListener("load", function(){
     }
 
     class Castle extends Building {
-        constructor(isPlayer) {
-            super(isPlayer);
+        constructor(team) {
+            super(team);
             this.maxHP = 100;
             this.hp = this.maxHP;
             this.damageNumbers = [];
@@ -409,7 +416,7 @@ window.addEventListener("load", function(){
             this.height = 300;
             this.y = gameHeight - this.height - gameFloor;
 
-            if (this.isPlayer) {
+            if (this.team.isPlayer) {
                 this.x = 10;
             } else {
                 this.x = gameWidth - this.width - 10;
@@ -418,10 +425,10 @@ window.addEventListener("load", function(){
             this.buildingCount = 2;
             this.buildingPlots = [];
             for (let i = 0; i < this.buildingCount; i++) {
-                if (this.isPlayer) {
-                    this.buildingPlots.push(new BuildingPlot(true, this.x + this.width * 2 + this.width * i));
+                if (this.team.isPlayer) {
+                    this.buildingPlots.push(new BuildingPlot(this.team, this.x + this.width * 2 + this.width * i));
                 } else {
-                    this.buildingPlots.push(new BuildingPlot(false, this.x - this.width - this.width * i));
+                    this.buildingPlots.push(new BuildingPlot(this.team, this.x - this.width - this.width * i));
                 }
             }
         }
@@ -437,19 +444,147 @@ window.addEventListener("load", function(){
             super.update();
             this.buildingPlots.forEach(buildingPlot => {
                 buildingPlot.update();
+                if (buildingPlot.building != null) {
+                    if (buildingPlot.building.hp <= 0) {
+                        buildingPlot.building = null;
+                    }
+                }
             });
         }
     }
 
+    class AuxillaryBuilding extends Building {
+        constructor(team, sx, sy, sWidth, xpReward) {
+            super(team);
+            this.damageNumbers = [];
+            this.xpReward = xpReward;
+            
+            this.width = sWidth;
+            this.height = this.width;
+            this.y = sy - this.height;
+
+            if (this.team.isPlayer) {
+                this.x = sx;
+            } else {
+                this.x = sx - this.width;
+            }
+        }
+    }
+
+    class Farm extends AuxillaryBuilding {
+        constructor(team, sx, sy, sWidth, xpReward) {
+            super(team, sx, sy, sWidth, xpReward);
+            this.maxHP = 20;
+            this.hp = this.maxHP;
+
+            this.foodInterval = 6;
+            
+            this.image = document.getElementById("farmIconImage");
+
+            setInterval(() => {
+                this.produceFood();
+            }, 1000 * this.foodInterval);
+        }
+
+        produceFood() {
+            if (this.hp > 0) {
+                this.team.resources.food += 1;
+            }
+        }
+    }
+
+    class Mine extends AuxillaryBuilding {
+        constructor(team, sx, sy, sWidth, xpReward) {
+            super(team, sx, sy, sWidth, xpReward);
+            this.maxHP = 100;
+            this.hp = this.maxHP;
+
+            this.stoneInterval = 6;
+            
+            this.image = document.getElementById("mineIconImage");
+
+            setInterval(() => {
+                this.produceStone();
+            }, 1000 * this.stoneInterval);
+        }
+
+        produceStone() {
+            if (this.hp > 0) {
+                this.team.resources.stone += 1;
+            }
+        }
+    }
+
+    class Sawmill extends AuxillaryBuilding {
+        constructor(team, sx, sy, sWidth, xpReward) {
+            super(team, sx, sy, sWidth, xpReward);
+            this.maxHP = 100;
+            this.hp = this.maxHP;
+
+            this.woodInterval = 6;
+            
+            this.image = document.getElementById("sawmillIconImage");
+
+            setInterval(() => {
+                this.produceWood();
+            }, 1000 * this.woodInterval);
+        }
+
+        produceWood() {
+            if (this.hp > 0) {
+                this.team.resources.wood += 1;
+            }
+        }
+    }
+
+    class House extends AuxillaryBuilding {
+        constructor(team, sx, sy, sWidth, xpReward) {
+            super(team, sx, sy, sWidth, xpReward);
+            this.maxHP = 50;
+            this.hp = this.maxHP;
+            
+            this.image = document.getElementById("houseIconImage");
+
+            this.team.housingMax += 2;
+        }
+
+        update() {
+            super.update();
+            if (this.hp <= 0) {
+                this.team.housingMax -= 2;
+            }
+        }
+    }
+
+    class Tower extends AuxillaryBuilding {
+        constructor(team, sx, sy, sWidth, xpReward) {
+            super(team, sx, sy, sWidth, xpReward);
+            this.maxHP = 150;
+            this.hp = this.maxHP;
+            
+            this.image = document.getElementById("towerIconImage");
+        }
+    }
+
+    class Barracks extends AuxillaryBuilding {
+        constructor(team, sx, sy, sWidth, xpReward) {
+            super(team, sx, sy, sWidth, xpReward);
+            this.maxHP = 100;
+            this.hp = this.maxHP;
+            
+            this.image = document.getElementById("shieldIconImage");
+        }
+    }
+
     class BuildingPlot {
-        constructor(isPlayer, x) {
-            this.isPlayer = isPlayer;
+        constructor(team, x) {
+            this.team = team;
             this.image = document.getElementById("plankImage");
             this.width = 200;
             this.height = 20;
             this.y = gameHeight - this.height - gameFloor;
 
-            if (this.isPlayer) {
+            if (this.team.isPlayer) {
                 this.x = x;
             } else {
                 this.x = x - this.width;
@@ -468,12 +603,12 @@ window.addEventListener("load", function(){
             this.buildingButtons = [];
 
             for (let i = 0; i < this.buildingButtonsCount; i++) {
-                this.buildingButtons.push(new BuildingButton(i, this.x, this.y, this.width, this.height));
+                this.buildingButtons.push(new BuildingButton(i, this));
             }
         }
 
         draw(context) {
-            if (this.building == null && this.isPlayer) {
+            if (this.building == null && this.team.isPlayer) {
                 if (this.buildButtonClicked) {
                     this.buildingButtons.forEach(buildingButton => buildingButton.draw(context));
                 } else {
@@ -495,31 +630,68 @@ window.addEventListener("load", function(){
         }
 
         handleClick(x, y) {
-            if (
-                x >= this.buildButtonX && x <= this.buildButtonX + this.buildButtonWidth &&
-                y >= this.buildButtonY && y <= this.buildButtonY + this.buildButtonHeight &&
-                !this.buildButtonClicked
-            ) {
-                this.buildButtonClicked = true;
-                return;
-            }
+            if (this.building != null) {
 
-            let clickedOnBuildingButton = false;
-            this.buildingButtons.forEach(buildingButton => {
-                if (buildingButton.handleClick(x, y)) {
-                    clickedOnBuildingButton = true;
+                // check if clicked on building
+
+            } else if (this.buildButtonClicked) {
+
+                let clickedOnBuildingButton = false;
+                this.buildingButtons.forEach(buildingButton => {
+                    if (buildingButton.handleClick(x, y)) {
+                        clickedOnBuildingButton = true;
+                    }
+                });
+    
+                if (!clickedOnBuildingButton) {
+                    this.buildButtonClicked = false;
+                    clearDialogue();
                 }
-            });
 
-            if (!clickedOnBuildingButton) {
-                this.buildButtonClicked = false;
+            } else {
+                if (
+                    x >= this.buildButtonX && x <= this.buildButtonX + this.buildButtonWidth &&
+                    y >= this.buildButtonY && y <= this.buildButtonY + this.buildButtonHeight
+                ) {
+                    this.buildButtonClicked = true;
+                    return;
+                }
+            }
+        }
+
+        tryToBuild(idNumber, resourceCost) {
+            this.buildButtonClicked = false;
+            if (this.team.resources.deductOrFail(resourceCost)) {
+                this.building = this.getNewBuildingByID(idNumber);
+            }            
+        }
+
+        getNewBuildingByID(idNumber) {
+            switch (idNumber) {
+                case 0:
+                    return new Farm(this.team, this.x, this.y, this.width, 30);
+                case 1:
+                    return new House(this.team, this.x, this.y, this.width, 30);
+                case 2:
+                    return new Barracks(this.team, this.x, this.y, this.width, 30);
+                case 3:
+                    return new Mine(this.team, this.x, this.y, this.width, 30);
+                case 4:
+                    return new Tower(this.team, this.x, this.y, this.width, 30);
+                case 5:
+                    return new Sawmill(this.team, this.x, this.y, this.width, 30);
             }
         }
     }
 
     class BuildingButton {
-        constructor(idNumber, plotX, plotY, plotWidth) {
+        constructor(idNumber, buildingPlot) {
             this.idNumber = idNumber;
+            this.buildingPlot = buildingPlot;
+
+            let plotWidth = this.buildingPlot.width;
+            let plotX = this.buildingPlot.x;
+            let plotY = this.buildingPlot.y;
 
             this.width = plotWidth / 3;
             this.height = this.width;
@@ -535,29 +707,47 @@ window.addEventListener("load", function(){
                 case 0:
                     this.y -= this.width;
                     this.image = document.getElementById("farmIconImage");
+                    this.name = "Farm";
+                    this.description = "Produces 1 food every 30 seconds, reduced by 60% for each additional level. Produces 1 horse every 60 seconds after the second era, also reduced.";
+                    this.buildCost = new Resources(0, 2, 1, 0, 0);
                     break;
                 case 1:
                     this.y -= this.width;
                     this.x += this.width + this.padding;
                     this.image = document.getElementById("houseIconImage");
+                    this.name = "House";
+                    this.description = "Increases total population capacity by 3, increased by 1 for each additional level.";
+                    this.buildCost = new Resources(2, 3, 0, 0, 0);
                     break;
                 case 2:
                     this.y -= 2 * this.width + this.padding;
                     this.image = document.getElementById("shieldIconImage");
+                    this.name = "Barracks";
+                    this.description = "Increases the amount of experience soldiers earn by 20% and reduces their training time by 10%, both increased by 10% for each additional level.";
+                    this.buildCost = new Resources(2, 3, 2, 0, 0);
                     break;
                 case 3:
                     this.y -= 2 * this.width + this.padding;
                     this.x += this.width + this.padding;
                     this.image = document.getElementById("mineIconImage");
+                    this.name = "Mine";
+                    this.description = "Produces 1 stone every 60 seconds, reduced by 60% for each additional level. Produces 1 metal every 120 seconds after the second era, also reduced.";
+                    this.buildCost = new Resources(0, 2, 3, 0, 0);
                     break;
                 case 4:
                     this.y -= 3 * this.width + (this.padding * 2);
                     this.image = document.getElementById("towerIconImage");
+                    this.name = "Tower";
+                    this.description = "Strong building that attacks enemy soldiers. Can attack 1 soldier at once per level.";
+                    this.buildCost = new Resources(1, 2, 3, 0, 0);
                     break;
                 case 5:
                     this.y -= 3 * this.width + (this.padding * 2);
                     this.x += this.width + this.padding;
                     this.image = document.getElementById("sawmillIconImage");
+                    this.name = "Sawmill";
+                    this.description = "Produces 1 wood every 45 seconds, reduced by 60% for each additional level.";
+                    this.buildCost = new Resources(0, 3, 2, 0, 0);
                     break;
             }
         }
@@ -586,6 +776,26 @@ window.addEventListener("load", function(){
 
         update() {
             this.x += cameraSpeed;
+            
+            if (this.clicked) {
+                let dialogueTitle = document.getElementById("dialogueTitle");
+                dialogueTitle.innerHTML = this.name;
+    
+                let dialogueContent = document.getElementById("dialogueContent");
+                dialogueContent.innerHTML = this.description;
+    
+                let dialogueButtons = document.getElementById("dialogueButtons");
+                dialogueButtons.innerHTML = "";
+                
+                let buildingButton = this;
+                let buildButton = document.createElement("button");
+                buildButton.innerHTML = "Build " + this.buildCost.getHTMLString();
+                buildButton.addEventListener("click", function() {
+                    buildingButton.handleBuildConfirmClick(this.idNumber);
+                });
+    
+                dialogueButtons.appendChild(buildButton);
+            }
         }
 
         handleClick(x, y) {
@@ -599,6 +809,12 @@ window.addEventListener("load", function(){
                 this.clicked = false;
                 return false;
             }
+        }
+
+        handleBuildConfirmClick() {
+            this.clicked = false;
+            this.buildingPlot.tryToBuild(this.idNumber, this.buildCost);
+            clearDialogue();
         }
     }
 
@@ -674,13 +890,62 @@ window.addEventListener("load", function(){
             this.horses *= (1 + (percent / 100));
             this.metal *= (1 + (percent / 100));
         }
+
+        getHTMLString() {
+            let string = "";
+            let first = true;
+            if (this.food > 0) {
+                string += '<img class="resourceIcon resourceCostIcon" src="/images/icons/resourceIcons/wheatIcon.png"/>'
+                string += " " + this.food;
+                first = false;
+            }
+            if (this.wood > 0) { 
+                if (!first) {
+                    string += " ";
+                } else {
+                    first = false;
+                }
+                string += '<img class="resourceIcon resourceCostIcon" src="/images/icons/resourceIcons/woodIcon.png"/>'
+                string += " " + this.wood;
+            }
+            if (this.stone > 0) {
+                if (!first) {
+                    string += " ";
+                } else {
+                    first = false;
+                }
+                string += '<img class="resourceIcon resourceCostIcon" src="/images/icons/resourceIcons/stoneIcon.png"/>'
+                string += " " + this.stone;
+            }
+            if (this.horses > 0) {
+                if (!first) {
+                    string += " ";
+                } else {
+                    first = false;
+                }
+                string += '<img class="resourceIcon resourceCostIcon" src="/images/icons/resourceIcons/horseIcon.png"/>'
+                string += " " + this.horses;
+            }
+            if (this.metal > 0) {
+                if (!first) {
+                    string += " ";
+                } else {
+                    first = false;
+                }
+                string += '<img class="resourceIcon resourceCostIcon" src="/images/icons/resourceIcons/ingotIcon.png"/>'
+                string += " " + this.metal;
+            }
+            return string;
+        }
     }
 
     class Team {
         constructor(isPlayer, username) {
             this.isPlayer = isPlayer;
             this.username = username;
-            this.castle = new Castle(isPlayer);
+            this.castle = new Castle(this);
+            this.soldierTypes = [];
+            this.soldiers = [];
 
             this.era = 0;
             this.eraXP = 0;
@@ -691,6 +956,11 @@ window.addEventListener("load", function(){
             this.housing = 0;
             this.housingMax = 5;
 
+            this.timeWithoutRefresh = 0;
+            this.timeToRefresh = 1;
+
+            this.setSoldierTypes();
+
             if (this.isPlayer) {
                 this.updateUnitSpawnButtons();
             }
@@ -698,67 +968,73 @@ window.addEventListener("load", function(){
 
         draw(context) {
             this.castle.draw(context);
+            this.soldiers.forEach(soldier => {
+                soldier.draw(context);
+            });
         }
 
-        update() {
+        update(deltaTimestamp, opposingTeam) {
             this.castle.update();
+            this.soldiers.forEach(soldier => {
+                soldier.update(deltaTimestamp, opposingTeam);
+            })
+            this.soldiers = this.soldiers.filter(soldier => soldier.hp > 0);
+            this.housing = this.soldiers.length;
 
             if (this.eraXP >= this.eraXPMax) {
                 this.era++;
                 this.eraXP = 0;
                 this.eraXPMax *= (1 + (2 / 3));
+                this.setSoldierTypes();
+            }
 
+            if (this.timeWithoutRefresh > this.timeToRefresh * 1000) {
                 if (this.isPlayer) {
                     this.updateUnitSpawnButtons();
                 }
+                this.timeWithoutRefresh = 0;
+            } else {
+                this.timeWithoutRefresh += deltaTimestamp;
             }
         }
 
-        getUnits() {
+        setSoldierTypes() {
             switch (this.era) {
                 case 0:
-                    return [
+                    this.soldierTypes = [
                         new SoldierType("Smasher", 2, 2, 1, 1, 1, "soldierImage", new Resources(1, 0, 1, 0, 0)),
                         new SoldierType("Thrower", 1, 1, 2, 2, 3, "soldierImage", new Resources(1, 1, 0, 0, 0))
                     ];
+                    break;
                 case 1:
-                    return [
-                        new SoldierType("Smasher", 2, 2, 1, 1, 1, "soldierImage", new Resources(1, 0, 1, 0, 0)),
-                        new SoldierType("Thrower", 1, 1, 2, 2, 3, "soldierImage", new Resources(1, 1, 0, 0, 0))
-                    ];
+                    this.soldierTypes = [];
+                    break;
                 case 2:
-                    return [
-                        new SoldierType("Smasher", 2, 2, 1, 1, 1, "soldierImage", new Resources(1, 0, 1, 0, 0)),
-                        new SoldierType("Thrower", 1, 1, 2, 2, 3, "soldierImage", new Resources(1, 1, 0, 0, 0))
-                    ];
+                    this.soldierTypes = [];
+                    break;
                 case 3: 
-                    return [
-                        new SoldierType("Smasher", 2, 2, 1, 1, 1, "soldierImage", new Resources(1, 0, 1, 0, 0)),
-                        new SoldierType("Thrower", 1, 1, 2, 2, 3, "soldierImage", new Resources(1, 1, 0, 0, 0))
-                    ];
+                    this.soldierTypes = [];
+                    break;
                 case 4:
-                    return [
-                        new SoldierType("Smasher", 2, 2, 1, 1, 1, "soldierImage", new Resources(1, 0, 1, 0, 0)),
-                        new SoldierType("Thrower", 1, 1, 2, 2, 3, "soldierImage", new Resources(1, 1, 0, 0, 0))
-                    ];
+                    this.soldierTypes = [];
+                    break;
             }
         }
 
         updateUnitSpawnButtons() {
-            let unitContainer = document.getElementById("troopsContainer");
-            unitContainer.innerHTML = "";
+            let soldierTypeContainer = document.getElementById("troopsContainer");
+            soldierTypeContainer.innerHTML = "";
 
-            let units = this.getUnits();
             let team = this;
-            units.forEach(unit => {
+            this.soldierTypes.forEach(soldierType => {
                 let spawnButton = document.createElement("button");
-                spawnButton.textContent = unit.name + " Level: " + unit.level + " (" + unit.xp + "/" + unit.xpMax + ")";
-                spawnButton.id = unit.name;
+                spawnButton.textContent = soldierType.name + " Level: " + soldierType.level + " (" + soldierType.xp + "/" + soldierType.xpMax + ")";
+                spawnButton.id = soldierType.name;
                 spawnButton.addEventListener("click", function() {
-                    team.handleSoldierTypeClick(unit, team);
+                    team.handleSoldierTypeClick(soldierType, team);
                 });
 
-                unitContainer.appendChild(spawnButton);
+                soldierTypeContainer.appendChild(spawnButton);
             });
         }
 
@@ -781,7 +1057,7 @@ window.addEventListener("load", function(){
             dialogueButtons.innerHTML = "";
 
             let spawnButton = document.createElement("button");
-            spawnButton.innerHTML = "Spawn";
+            spawnButton.innerHTML = "Spawn " + soldierType.resourcesCost.getHTMLString();
             spawnButton.addEventListener("click", function() {
                 team.handleSpawnSoldierClick(soldierType);
             });
@@ -790,8 +1066,11 @@ window.addEventListener("load", function(){
         }
 
         handleSpawnSoldierClick(soldierType) {
-            if (this.resources.deductOrFail(soldierType.resourcesCost)) {
-                soldiers.push(new Soldier(true, soldierType, this.castle));
+            if (this.housing < this.housingMax) {
+                if (this.resources.deductOrFail(soldierType.resourcesCost)) {
+                    this.soldiers.push(new Soldier(this, soldierType, this.castle));
+                    this.housing++;
+                }
             }
         }
     }
@@ -835,7 +1114,7 @@ window.addEventListener("load", function(){
 
     let playerTeam = new Team(true, "johndoe");
     let enemyTeam = new Team(false, "janedoe");
-    let soldiers = [];
+    enemyTeam.soldiers.push(new Soldier(enemyTeam, new SoldierType("Smasher", 2, 2, 3, 2, 2, "soldierImage", new Resources(1, 0, 1, 0, 0)), enemyTeam.castle));
 
     function updateUI() {
         // Update player username
@@ -896,6 +1175,17 @@ window.addEventListener("load", function(){
         }
     }
 
+    function clearDialogue() {
+        let dialogueTitle = document.getElementById("dialogueTitle");
+        dialogueTitle.innerHTML = "Dialogue";
+
+        let dialogueContent = document.getElementById("dialogueContent");
+        dialogueContent.innerHTML = "dialogue content...";
+
+        let dialogueButtons = document.getElementById("dialogueButtons");
+        dialogueButtons.innerHTML = "";
+    }
+
     let prevTimestamp = 0;
 
     function animate(timestamp) {
@@ -907,18 +1197,11 @@ window.addEventListener("load", function(){
         background.draw(ctx);
         background.update(input);
 
-        let teams = [playerTeam, enemyTeam];
+        playerTeam.draw(ctx);
+        playerTeam.update(deltaTimestamp, enemyTeam);
 
-        teams.forEach(team => {
-            team.draw(ctx);
-            team.update();
-        });
-        
-        soldiers.forEach(soldier => {
-            soldier.draw(ctx);
-            soldier.update(deltaTimestamp, soldiers, teams);
-        });
-        soldiers = soldiers.filter(soldier => soldier.hp > 0);
+        enemyTeam.draw(ctx);
+        enemyTeam.update(deltaTimestamp, playerTeam);
 
         updateUI();
 
