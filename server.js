@@ -7,15 +7,14 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer);
 
-io.on("connect", (socket) => {
-    console.log("user connected with socketID=", socket.id);
-    socket.emit("hello");
-});
-  
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "public", "/html/index.html"));
+});
+
+io.on("connect", (socket) => {
+    console.log("user connected with socketID=", socket.id);
 });
 
 httpServer.listen(5000, () => {
